@@ -1504,7 +1504,6 @@ type AuthenticateRequest struct {
 	Id        string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	AccountId string `protobuf:"bytes,2,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
 	// Types that are assignable to Request:
-	//
 	//	*AuthenticateRequest_Password
 	//	*AuthenticateRequest_Pin
 	//	*AuthenticateRequest_HeaderAuth
@@ -2611,7 +2610,6 @@ type SyncMappingsRequest struct {
 	unknownFields protoimpl.UnknownFields
 
 	// Types that are assignable to Msg:
-	//
 	//	*SyncMappingsRequest_Init
 	//	*SyncMappingsRequest_Ack
 	Msg isSyncMappingsRequest_Msg `protobuf_oneof:"msg"`
