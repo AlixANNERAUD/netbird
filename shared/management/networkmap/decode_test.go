@@ -64,7 +64,6 @@ func TestResourceCompactLegacyWireFormat(t *testing.T) {
 func TestNameServerURLWireRoundTrip(t *testing.T) {
 	for _, ns := range []nbdns.NameServer{
 		{NSType: nbdns.DoHNameServerType, URL: "https://dns.example/dns-query"},
-		{NSType: nbdns.NextDNSNameServerType, URL: "abc123"},
 	} {
 		t.Run(ns.NSType.String(), func(t *testing.T) {
 			encoded := ConvertToProtoNameServerGroup(&nbdns.NameServerGroup{NameServers: []nbdns.NameServer{ns}})

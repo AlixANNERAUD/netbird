@@ -83,7 +83,7 @@ const (
 	PeerCapability_PeerCapabilityIPv6Overlay PeerCapability = 2
 	// Client receives NetworkMap as components and assembles it locally.
 	PeerCapability_PeerCapabilityComponentNetworkMap PeerCapability = 3
-	// Understands URL-based DoH and NextDNS nameservers.
+	// Understands URL-based DoH nameservers.
 	PeerCapability_PeerCapabilityDNSOverHTTPS PeerCapability = 4
 )
 
@@ -3944,7 +3944,7 @@ type NameServer struct {
 	NSType int64  `protobuf:"varint,2,opt,name=NSType,proto3" json:"NSType,omitempty"`
 	Port   int64  `protobuf:"varint,3,opt,name=Port,proto3" json:"Port,omitempty"`
 	// URL is used for non-IP nameserver types. For DoH it stores the full
-	// https endpoint; for NextDNS it stores the profile/config ID.
+	// https endpoint.
 	URL string `protobuf:"bytes,4,opt,name=URL,proto3" json:"URL,omitempty"`
 }
 

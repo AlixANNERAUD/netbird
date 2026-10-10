@@ -38,14 +38,6 @@ func TestParseNameServerURL(t *testing.T) {
 			},
 		},
 		{
-			name:  "nextdns shorthand stores config id",
-			input: "nextdns://abc123",
-			want: NameServer{
-				NSType: NextDNSNameServerType,
-				URL:    "abc123",
-			},
-		},
-		{
 			name:    "unknown scheme rejected",
 			input:   "ftp://1.2.3.4:53",
 			wantErr: true,
@@ -53,11 +45,6 @@ func TestParseNameServerURL(t *testing.T) {
 		{
 			name:    "doh missing host rejected",
 			input:   "doh:///dns-query",
-			wantErr: true,
-		},
-		{
-			name:    "nextdns missing id rejected",
-			input:   "nextdns://",
 			wantErr: true,
 		},
 	}
@@ -82,7 +69,7 @@ func TestParseNameServerURL(t *testing.T) {
 }
 
 func TestNameServerType_RoundTrip(t *testing.T) {
-	for _, tc := range []NameServerType{UDPNameServerType, DoHNameServerType, NextDNSNameServerType} {
+	for _, tc := range []NameServerType{UDPNameServerType, DoHNameServerType} {
 		got := ToNameServerType(tc.String())
 		if got != tc {
 			t.Errorf("round-trip mismatch for %v: got %v", tc, got)

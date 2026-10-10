@@ -251,7 +251,7 @@ enum PeerCapability {
   PeerCapabilityIPv6Overlay = 2;
   // Client receives NetworkMap as components and assembles it locally.
   PeerCapabilityComponentNetworkMap = 3;
-  // Understands URL-based DoH and NextDNS nameservers.
+  // Understands URL-based DoH nameservers.
   PeerCapabilityDNSOverHTTPS = 4;
 }
 
@@ -662,7 +662,7 @@ message NameServer {
   int64  NSType = 2;
   int64  Port = 3;
   // URL is used for non-IP nameserver types. For DoH it stores the full
-  // https endpoint; for NextDNS it stores the profile/config ID.
+  // https endpoint.
   string URL = 4;
 }
 

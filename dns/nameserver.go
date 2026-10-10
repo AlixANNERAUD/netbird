@@ -16,10 +16,6 @@ const (
 	// DoHNameServerType DNS-over-HTTPS nameserver type. The full DoH URL is
 	// stored on NameServer.URL; IP and Port are unused.
 	DoHNameServerType
-	// NextDNSNameServerType NextDNS DoH shorthand. NameServer.URL holds the
-	// NextDNS profile/config ID; the client builds the full URL at query time
-	// and appends device identification.
-	NextDNSNameServerType
 )
 
 const (
@@ -31,8 +27,6 @@ const (
 	UDPNameServerTypeString = "udp"
 	// DoHNameServerTypeString DoH nameserver type as string
 	DoHNameServerTypeString = "doh"
-	// NextDNSNameServerTypeString NextDNS nameserver type as string
-	NextDNSNameServerTypeString = "nextdns"
 )
 
 // NameServerType nameserver type
@@ -45,8 +39,6 @@ func (n NameServerType) String() string {
 		return UDPNameServerTypeString
 	case DoHNameServerType:
 		return DoHNameServerTypeString
-	case NextDNSNameServerType:
-		return NextDNSNameServerTypeString
 	default:
 		return InvalidNameServerTypeString
 	}
@@ -59,8 +51,6 @@ func ToNameServerType(typeString string) NameServerType {
 		return UDPNameServerType
 	case DoHNameServerTypeString:
 		return DoHNameServerType
-	case NextDNSNameServerTypeString:
-		return NextDNSNameServerType
 	default:
 		return InvalidNameServerType
 	}
@@ -93,14 +83,14 @@ type NameServerGroup struct {
 
 // NameServer represents a DNS nameserver
 type NameServer struct {
-	// IP address of nameserver (UDP/DoT). Unset for DoH/NextDNS.
+	// IP address of nameserver (UDP/DoT). Unset for DoH.
 	IP netip.Addr
 	// NSType nameserver type
 	NSType NameServerType
-	// Port nameserver listening port (UDP/DoT). Unset for DoH/NextDNS.
+	// Port nameserver listening port (UDP/DoT). Unset for DoH.
 	Port int
 	// URL is used for non-IP nameserver types. For DoH it stores the full
-	// `https://...` endpoint; for NextDNS it stores the profile/config ID.
+	// `https://...` endpoint.
 	URL string
 }
 
@@ -138,7 +128,6 @@ func (n *NameServer) AddrPort() netip.AddrPort {
 //
 //	udp://<ip>:<port>            e.g. udp://1.1.1.1:53
 //	doh://<host>[:<port>]/<path> e.g. doh://dns.google/dns-query
-//	nextdns://<config_id>        e.g. nextdns://abc123
 func ParseNameServerURL(nsURL string) (NameServer, error) {
 	parsedURL, err := url.Parse(nsURL)
 	if err != nil {
@@ -174,17 +163,6 @@ func ParseNameServerURL(nsURL string) (NameServer, error) {
 		dohURL := *parsedURL
 		dohURL.Scheme = "https"
 		ns.URL = dohURL.String()
-
-	case NextDNSNameServerType:
-		// Accept both nextdns://<id> (id parsed as host) and nextdns:<id>.
-		configID := parsedURL.Host
-		if configID == "" {
-			configID = strings.TrimPrefix(parsedURL.Opaque, "/")
-		}
-		if configID == "" {
-			return NameServer{}, fmt.Errorf("nextdns nameserver url is missing config id")
-		}
-		ns.URL = configID
 	}
 
 	return ns, nil
