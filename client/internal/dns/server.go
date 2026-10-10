@@ -1019,7 +1019,7 @@ func upstreamTargetFromNameServer(ns nbdns.NameServer, runtimeIP netip.Addr, war
 			return upstreamTarget{}, false
 		}
 		return udpUpstreamTarget(ns.AddrPort()), true
-	case nbdns.DoHNameServerType, nbdns.NextDNSNameServerType:
+	case nbdns.DoHNameServerType:
 		if ns.URL == "" {
 			if warn {
 				log.Warnf("skipping %s nameserver with empty URL", ns.NSType)

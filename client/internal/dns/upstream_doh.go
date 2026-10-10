@@ -12,41 +12,33 @@ import (
 	"net/http"
 	"net/netip"
 	"net/url"
-	"strings"
 	"time"
 
 	"github.com/miekg/dns"
 	log "github.com/sirupsen/logrus"
 
-	"github.com/netbirdio/netbird/client/internal/peer"
 	nbnet "github.com/netbirdio/netbird/client/net"
 	nbdns "github.com/netbirdio/netbird/dns"
 )
 
 const (
 	dohContentType = "application/dns-message"
-	nextdnsBaseURL = "https://dns.nextdns.io/"
 	dohProtocol    = "doh"
 )
 
-// dohClient shares HTTP connections across DoH and NextDNS upstreams.
+// dohClient shares HTTP connections across DoH upstreams.
 // Bootstrap resolution uses the original host nameservers to avoid querying
 // NetBird's own resolver after it takes over system DNS.
 type dohClient struct {
 	httpClient *http.Client
-	// deviceFn returns the device identifier appended to NextDNS requests.
-	// Tests inject a stub; production wires it to the local peer FQDN.
-	deviceFn func() string
 	// bootstrap returns the nameservers to use for resolving DoH endpoint
 	// hostnames. Set by the resolver after construction; without it the
 	// client cannot resolve non-IP hosts.
 	bootstrap func() []netip.AddrPort
 }
 
-func newDoHClient(statusRecorder *peer.Status) *dohClient {
-	c := &dohClient{
-		deviceFn: deviceFnFromStatus(statusRecorder),
-	}
+func newDoHClient() *dohClient {
+	c := &dohClient{}
 	c.httpClient = &http.Client{
 		Timeout:       ClientTimeout,
 		CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse },
@@ -83,10 +75,6 @@ func (c *dohClient) exchange(ctx context.Context, target upstreamTarget, r *dns.
 	req.Header.Set("Content-Type", dohContentType)
 	req.Header.Set("Accept", dohContentType)
 
-	if target.NSType == nbdns.NextDNSNameServerType {
-		c.setNextDNSDeviceHeaders(req)
-	}
-
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, time.Since(start), fmt.Errorf("doh exchange: %w", err)
@@ -118,7 +106,7 @@ func (c *dohClient) exchange(ctx context.Context, target upstreamTarget, r *dns.
 	return rm, time.Since(start), nil
 }
 
-// endpointURL expands NextDNS profile IDs and validates encrypted endpoints.
+// endpointURL validates encrypted endpoints.
 func (c *dohClient) endpointURL(target upstreamTarget) (string, error) {
 	switch target.NSType {
 	case nbdns.DoHNameServerType:
@@ -130,55 +118,9 @@ func (c *dohClient) endpointURL(target upstreamTarget) (string, error) {
 			return "", fmt.Errorf("invalid HTTPS doh endpoint")
 		}
 		return endpoint.String(), nil
-	case nbdns.NextDNSNameServerType:
-		if target.URL == "" {
-			return "", fmt.Errorf("nextdns upstream missing config id")
-		}
-		if len(target.URL) != 6 || strings.ContainsAny(target.URL, "/?#%") {
-			return "", fmt.Errorf("invalid nextdns config id")
-		}
-		for _, ch := range target.URL {
-			if !strings.ContainsRune("0123456789abcdef", ch) {
-				return "", fmt.Errorf("invalid nextdns config id")
-			}
-		}
-		return nextdnsBaseURL + target.URL, nil
 	default:
 		return "", fmt.Errorf("dohClient: unsupported nameserver type %s", target.NSType)
 	}
-}
-
-func deviceFnFromStatus(statusRecorder *peer.Status) func() string {
-	if statusRecorder == nil {
-		return nil
-	}
-	return func() string { return statusRecorder.GetLocalPeerState().FQDN }
-}
-
-// NextDNS identifies devices through headers, as in nextdns/nextdns/resolver/doh.go.
-// The short hostname keeps the device ID stable across account renames.
-func (c *dohClient) setNextDNSDeviceHeaders(req *http.Request) {
-	if c.deviceFn == nil {
-		return
-	}
-	fqdn := c.deviceFn()
-	if fqdn == "" {
-		return
-	}
-	req.Header.Set("X-Device-Name", fqdn)
-	if id := nextDNSDeviceID(fqdn); id != "" {
-		req.Header.Set("X-Device-Id", id)
-	}
-}
-
-// nextDNSDeviceID returns the stable identifier sent as X-Device-Id. The
-// short hostname (segment before the first dot) is stable across account
-// renames and short enough for the NextDNS dashboard column.
-func nextDNSDeviceID(fqdn string) string {
-	if i := strings.IndexByte(fqdn, '.'); i > 0 {
-		return fqdn[:i]
-	}
-	return fqdn
 }
 
 // dialContext uses the original nameservers and tunnel-bypassing sockets

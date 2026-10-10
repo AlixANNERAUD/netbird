@@ -241,7 +241,7 @@ func newUpstreamResolverBase(ctx context.Context, statusRecorder *peer.Status, d
 		domain:          d,
 		upstreamTimeout: UpstreamTimeout,
 		statusRecorder:  statusRecorder,
-		dohClient:       newDoHClient(statusRecorder),
+		dohClient:       newDoHClient(),
 	}
 }
 
@@ -250,7 +250,7 @@ func newUpstreamResolverBase(ctx context.Context, statusRecorder *peer.Status, d
 // specific UDP exchange implementations.
 func (u *upstreamResolverBase) exchangeUpstream(ctx context.Context, target upstreamTarget, r *dns.Msg) (*dns.Msg, time.Duration, error) {
 	switch target.NSType {
-	case nbdns.DoHNameServerType, nbdns.NextDNSNameServerType:
+	case nbdns.DoHNameServerType:
 		if u.dohClient == nil {
 			return nil, 0, fmt.Errorf("doh client not configured")
 		}

@@ -5,7 +5,6 @@ package dns
 import (
 	"context"
 	"net/netip"
-	"os"
 	"testing"
 	"time"
 
@@ -36,7 +35,7 @@ func liveBootstrap() func() []netip.AddrPort {
 //
 // Run: go test -tags=integration -count=1 -run TestDoHClient_Live ./client/internal/dns/...
 func TestDoHClient_Live_Cloudflare(t *testing.T) {
-	c := newDoHClient(nil)
+	c := newDoHClient()
 	c.bootstrap = liveBootstrap()
 
 	target := upstreamTarget{
@@ -55,46 +54,4 @@ func TestDoHClient_Live_Cloudflare(t *testing.T) {
 	assert.Equal(t, dns.RcodeSuccess, resp.Rcode, "expected NOERROR, got %s", dns.RcodeToString[resp.Rcode])
 	assert.NotEmpty(t, resp.Answer, "expected at least one answer record")
 	t.Logf("DoH cloudflare-dns.com rtt=%s answers=%d", rtt.Truncate(time.Millisecond), len(resp.Answer))
-}
-
-// TestDoHClient_Live_NextDNS_URLShape sanity-checks the NextDNS URL builder
-// against a real NextDNS deployment by sending a query to their public
-// "trial" configuration (no auth). We don't validate the device tag from
-// here — that requires inspecting their dashboard — but a successful query
-// proves the URL is well-formed and the path-routed config ID is accepted.
-//
-// Skipped automatically if the NETBIRD_TEST_NEXTDNS_CONFIG_ID env var is
-// empty so the test can run in environments without a NextDNS profile.
-func TestDoHClient_Live_NextDNS_URLShape(t *testing.T) {
-	configID := envOrSkip(t, "NETBIRD_TEST_NEXTDNS_CONFIG_ID")
-
-	c := newDoHClient(nil)
-	c.bootstrap = liveBootstrap()
-	c.deviceFn = func() string { return "netbird-doh-live-test" }
-
-	target := upstreamTarget{
-		NSType: nbdns.NextDNSNameServerType,
-		URL:    configID,
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	q := new(dns.Msg).SetQuestion("example.com.", dns.TypeA)
-	resp, rtt, err := c.exchange(ctx, target, q)
-	require.NoError(t, err, "live NextDNS exchange failed")
-	require.NotNil(t, resp)
-	assert.True(t, resp.Response)
-	assert.Equal(t, dns.RcodeSuccess, resp.Rcode, "expected NOERROR, got %s", dns.RcodeToString[resp.Rcode])
-	t.Logf("DoH dns.nextdns.io rtt=%s answers=%d (check the NextDNS dashboard for device=netbird-doh-live-test)",
-		rtt.Truncate(time.Millisecond), len(resp.Answer))
-}
-
-func envOrSkip(t *testing.T, key string) string {
-	t.Helper()
-	v := os.Getenv(key)
-	if v == "" {
-		t.Skipf("%s not set; skipping", key)
-	}
-	return v
 }

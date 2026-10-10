@@ -40,7 +40,7 @@ func TestDoHBootstrapFailover(t *testing.T) {
 	blackhole := testDoHDNSServer(t, func(dns.ResponseWriter, *dns.Msg) {})
 	var hits atomic.Int32
 	healthy := testDoHDNSServer(t, func(w dns.ResponseWriter, r *dns.Msg) { hits.Add(1); assert.NoError(t, testDoHDNSReply(w, r, 42)) })
-	c := newDoHClient(nil)
+	c := newDoHClient()
 	c.bootstrap = func() []netip.AddrPort { return []netip.AddrPort{blackhole, healthy} }
 	ctx, cancel := context.WithTimeout(t.Context(), 500*time.Millisecond)
 	defer cancel()
@@ -52,7 +52,7 @@ func TestDoHBootstrapTTLZero(t *testing.T) {
 	var last atomic.Uint32
 	last.Store(42)
 	server := testDoHDNSServer(t, func(w dns.ResponseWriter, r *dns.Msg) { assert.NoError(t, testDoHDNSReply(w, r, byte(last.Load()))) })
-	c := newDoHClient(nil)
+	c := newDoHClient()
 	c.bootstrap = func() []netip.AddrPort { return []netip.AddrPort{server} }
 	first, err := c.resolveBootstrap(t.Context(), "dns.example.com")
 	require.NoError(t, err)
@@ -81,7 +81,7 @@ func TestDoHRedirectDowngrade(t *testing.T) {
 		http.Redirect(w, r, plain.URL, http.StatusTemporaryRedirect)
 	}))
 	defer secure.Close()
-	c := newDoHClient(nil)
+	c := newDoHClient()
 	c.httpClient.Transport.(*http.Transport).TLSClientConfig = secure.Client().Transport.(*http.Transport).TLSClientConfig.Clone()
 	_, _, err := c.exchange(t.Context(), upstreamTarget{NSType: nbdns.DoHNameServerType, URL: secure.URL}, new(dns.Msg).SetQuestion("example.com.", dns.TypeA))
 	assert.Error(t, err, "HTTPS DoH must reject a redirect to plaintext HTTP")
@@ -128,7 +128,7 @@ func TestDoHResponseValidation(t *testing.T) {
 }
 
 func TestDoHEndpointValidation(t *testing.T) {
-	c := newDoHClient(nil)
+	c := newDoHClient()
 	for _, endpoint := range []string{"http://dns.example/query", "https://user:password@dns.example/query", "https://dns.example/query#fragment", "https:///query"} {
 		_, err := c.endpointURL(upstreamTarget{NSType: nbdns.DoHNameServerType, URL: endpoint})
 		require.Error(t, err, "invalid endpoint %q must be rejected", endpoint)
