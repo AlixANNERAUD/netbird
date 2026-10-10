@@ -494,7 +494,7 @@ func (e *componentEncoder) encodeNameServerGroups(nsgs []*nmdata.NameServerGroup
 		}
 		entry := &proto.NameServerGroupRaw{
 			Id:                   nsg.PublicID,
-			Nameservers:          networkmap.NameServersForPeer(encodeNameServers(nsg.NameServers), e.supportsDoH()),
+			Nameservers:          networkmap.NameServersForPeer(encodeNameServers(nsg.NameServers), e.nameServerSupport()),
 			GroupIds:             e.groupPublicXids(nsg.Groups),
 			Primary:              nsg.Primary,
 			Domains:              nsg.Domains,
@@ -508,9 +508,12 @@ func (e *componentEncoder) encodeNameServerGroups(nsgs []*nmdata.NameServerGroup
 	return out
 }
 
-func (e *componentEncoder) supportsDoH() bool {
+func (e *componentEncoder) nameServerSupport() networkmap.NameServerSupport {
 	peer := e.components.GetPeerInfo(e.components.PeerID)
-	return peer != nil && peer.HasCapability(nmdata.PeerCapabilityDNSOverHTTPS)
+	if peer == nil {
+		return networkmap.NameServerSupport{}
+	}
+	return networkmap.NameServerSupportOf(peer.HasCapability)
 }
 
 func encodeNameServers(servers []nmdata.NameServer) []*proto.NameServer {

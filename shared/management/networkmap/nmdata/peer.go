@@ -13,6 +13,7 @@ const (
 	PeerCapabilityIPv6Overlay         int32 = 2
 	PeerCapabilityComponentNetworkMap int32 = 3
 	PeerCapabilityDNSOverHTTPS        int32 = 4
+	PeerCapabilityDNSOverTLS          int32 = 5
 )
 
 // Peer is the slim twin of peer.Peer.

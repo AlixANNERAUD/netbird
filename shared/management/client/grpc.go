@@ -1079,6 +1079,7 @@ func peerCapabilities(info system.Info) []proto.PeerCapability {
 	caps := []proto.PeerCapability{
 		proto.PeerCapability_PeerCapabilitySourcePrefixes,
 		proto.PeerCapability_PeerCapabilityDNSOverHTTPS,
+		proto.PeerCapability_PeerCapabilityDNSOverTLS,
 	}
 	if !info.DisableIPv6 {
 		caps = append(caps, proto.PeerCapability_PeerCapabilityIPv6Overlay)

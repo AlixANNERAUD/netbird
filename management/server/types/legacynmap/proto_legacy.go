@@ -13,7 +13,6 @@ import (
 	"github.com/netbirdio/netbird/management/server/types"
 	nbroute "github.com/netbirdio/netbird/route"
 	"github.com/netbirdio/netbird/shared/management/networkmap"
-	"github.com/netbirdio/netbird/shared/management/networkmap/nmdata"
 	"github.com/netbirdio/netbird/shared/management/proto"
 	"github.com/netbirdio/netbird/shared/netiputil"
 )
@@ -168,7 +167,7 @@ func ToProtoNetworkMap(
 	pm := &proto.NetworkMap{
 		Serial:     nm.Network.CurrentSerial(),
 		Routes:     ToProtocolRoutes(nm.Routes),
-		DNSConfig:  networkmap.DNSConfigForPeer(networkmap.ToProtocolDNSConfig(nm.DNSConfig, dnsCache, dnsFwdPort), peer.HasCapability(nmdata.PeerCapabilityDNSOverHTTPS)),
+		DNSConfig:  networkmap.DNSConfigForPeer(networkmap.ToProtocolDNSConfig(nm.DNSConfig, dnsCache, dnsFwdPort), networkmap.NameServerSupportOf(peer.HasCapability)),
 		PeerConfig: peerConfig,
 	}
 

@@ -340,16 +340,48 @@ func BuildAuthorizedUsersProto(ctx context.Context, authorizedUsers map[string]m
 	return hashedUsers, machineUsers
 }
 
+// NameServerSupport lists the encrypted nameserver transports a peer understands.
+type NameServerSupport struct {
+	DoH bool
+	DoT bool
+}
+
+// NameServerSupportOf derives the encrypted nameserver transports a peer
+// understands from its advertised capabilities.
+func NameServerSupportOf(hasCapability func(int32) bool) NameServerSupport {
+	return NameServerSupport{
+		DoH: hasCapability(nmdata.PeerCapabilityDNSOverHTTPS),
+		DoT: hasCapability(nmdata.PeerCapabilityDNSOverTLS),
+	}
+}
+
+func (s NameServerSupport) all() bool {
+	return s.DoH && s.DoT
+}
+
+func (s NameServerSupport) allows(server *proto.NameServer) bool {
+	switch nbdns.NameServerType(server.GetNSType()) {
+	case nbdns.UDPNameServerType:
+		return server.GetIP() != ""
+	case nbdns.DoHNameServerType:
+		return s.DoH
+	case nbdns.DoTNameServerType:
+		return s.DoT
+	default:
+		return false
+	}
+}
+
 // DNSConfigForPeer omits unsupported nameservers without modifying cached groups.
-func DNSConfigForPeer(config *proto.DNSConfig, supportsDoH bool) *proto.DNSConfig {
-	if supportsDoH || config == nil {
+func DNSConfigForPeer(config *proto.DNSConfig, support NameServerSupport) *proto.DNSConfig {
+	if support.all() || config == nil {
 		return config
 	}
 	filtered := goproto.Clone(config).(*proto.DNSConfig)
 	groups := filtered.NameServerGroups
 	filtered.NameServerGroups = nil
 	for _, group := range groups {
-		servers := NameServersForPeer(group.NameServers, false)
+		servers := NameServersForPeer(group.NameServers, support)
 		if len(servers) == 0 {
 			continue
 		}
@@ -360,13 +392,13 @@ func DNSConfigForPeer(config *proto.DNSConfig, supportsDoH bool) *proto.DNSConfi
 }
 
 // NameServersForPeer retains only transports understood by the receiving client.
-func NameServersForPeer(servers []*proto.NameServer, supportsDoH bool) []*proto.NameServer {
-	if supportsDoH {
+func NameServersForPeer(servers []*proto.NameServer, support NameServerSupport) []*proto.NameServer {
+	if support.all() {
 		return servers
 	}
 	var filtered []*proto.NameServer
 	for _, server := range servers {
-		if server.GetNSType() == int64(nbdns.UDPNameServerType) && server.GetIP() != "" {
+		if support.allows(server) {
 			filtered = append(filtered, server)
 		}
 	}

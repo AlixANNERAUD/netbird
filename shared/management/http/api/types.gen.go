@@ -674,6 +674,7 @@ func (e JobResponseStatus) Valid() bool {
 // Defines values for NameserverNsType.
 const (
 	NameserverNsTypeDoh NameserverNsType = "doh"
+	NameserverNsTypeDot NameserverNsType = "dot"
 	NameserverNsTypeUdp NameserverNsType = "udp"
 )
 
@@ -681,6 +682,8 @@ const (
 func (e NameserverNsType) Valid() bool {
 	switch e {
 	case NameserverNsTypeDoh:
+		return true
+	case NameserverNsTypeDot:
 		return true
 	case NameserverNsTypeUdp:
 		return true
@@ -3542,23 +3545,27 @@ type NBVersionCheck = MinVersionCheck
 
 // Nameserver defines model for Nameserver.
 type Nameserver struct {
-	// Ip Nameserver IP. Required for `udp` nameservers. Empty for `doh`.
+	// Ip Nameserver IP. Required for `udp` nameservers. Empty for `doh` and `dot`.
 	Ip *string `json:"ip,omitempty"`
 
 	// NsType Nameserver Type. `udp` uses plain DNS over UDP. `doh` issues
 	// DNS-over-HTTPS requests against the URL in the `url` field.
+	// `dot` issues DNS-over-TLS requests against the host in the `url` field.
 	NsType NameserverNsType `json:"ns_type"`
 
 	// Port Nameserver Port. Required for `udp` nameservers; ignored otherwise.
 	Port *int `json:"port,omitempty"`
 
 	// Url Nameserver URL. For `doh`, the full https endpoint
-	// (e.g. `https://dns.google/dns-query`).
+	// (e.g. `https://dns.google/dns-query`). For `dot`, `tls://<host>[:<port>]`
+	// with port 853 by default (e.g. `tls://dns.quad9.net`). An IP literal host
+	// needs no bootstrap lookup and is verified against the certificate's IP addresses.
 	Url *string `json:"url,omitempty"`
 }
 
 // NameserverNsType Nameserver Type. `udp` uses plain DNS over UDP. `doh` issues
 // DNS-over-HTTPS requests against the URL in the `url` field.
+// `dot` issues DNS-over-TLS requests against the host in the `url` field.
 type NameserverNsType string
 
 // NameserverGroup defines model for NameserverGroup.

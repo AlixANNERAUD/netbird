@@ -16,6 +16,9 @@ const (
 	// DoHNameServerType DNS-over-HTTPS nameserver type. The full DoH URL is
 	// stored on NameServer.URL; IP and Port are unused.
 	DoHNameServerType
+	// DoTNameServerType DNS-over-TLS nameserver type. NameServer.URL holds
+	// `tls://<host>[:<port>]`; IP and Port are unused.
+	DoTNameServerType
 )
 
 const (
@@ -27,6 +30,8 @@ const (
 	UDPNameServerTypeString = "udp"
 	// DoHNameServerTypeString DoH nameserver type as string
 	DoHNameServerTypeString = "doh"
+	// DoTNameServerTypeString DoT nameserver type as string
+	DoTNameServerTypeString = "dot"
 )
 
 // NameServerType nameserver type
@@ -39,6 +44,8 @@ func (n NameServerType) String() string {
 		return UDPNameServerTypeString
 	case DoHNameServerType:
 		return DoHNameServerTypeString
+	case DoTNameServerType:
+		return DoTNameServerTypeString
 	default:
 		return InvalidNameServerTypeString
 	}
@@ -51,6 +58,8 @@ func ToNameServerType(typeString string) NameServerType {
 		return UDPNameServerType
 	case DoHNameServerTypeString:
 		return DoHNameServerType
+	case DoTNameServerTypeString:
+		return DoTNameServerType
 	default:
 		return InvalidNameServerType
 	}
@@ -83,14 +92,14 @@ type NameServerGroup struct {
 
 // NameServer represents a DNS nameserver
 type NameServer struct {
-	// IP address of nameserver (UDP/DoT). Unset for DoH.
+	// IP address of nameserver (UDP). Unset for DoH and DoT.
 	IP netip.Addr
 	// NSType nameserver type
 	NSType NameServerType
-	// Port nameserver listening port (UDP/DoT). Unset for DoH.
+	// Port nameserver listening port (UDP). Unset for DoH and DoT.
 	Port int
 	// URL is used for non-IP nameserver types. For DoH it stores the full
-	// `https://...` endpoint.
+	// `https://...` endpoint; for DoT it stores `tls://<host>[:<port>]`.
 	URL string
 }
 
@@ -118,7 +127,7 @@ func (n *NameServer) IsEqual(other *NameServer) bool {
 }
 
 // AddrPort returns the nameserver as a netip.AddrPort. Only meaningful for
-// IP-based nameserver types (UDP/DoT).
+// the IP-based UDP nameserver type.
 func (n *NameServer) AddrPort() netip.AddrPort {
 	return netip.AddrPortFrom(n.IP, uint16(n.Port))
 }
@@ -128,6 +137,7 @@ func (n *NameServer) AddrPort() netip.AddrPort {
 //
 //	udp://<ip>:<port>            e.g. udp://1.1.1.1:53
 //	doh://<host>[:<port>]/<path> e.g. doh://dns.google/dns-query
+//	dot://<host>[:<port>]        e.g. dot://dns.quad9.net
 func ParseNameServerURL(nsURL string) (NameServer, error) {
 	parsedURL, err := url.Parse(nsURL)
 	if err != nil {
@@ -163,9 +173,31 @@ func ParseNameServerURL(nsURL string) (NameServer, error) {
 		dohURL := *parsedURL
 		dohURL.Scheme = "https"
 		ns.URL = dohURL.String()
+
+	case DoTNameServerType:
+		dotURL, err := parseDoTURL(parsedURL)
+		if err != nil {
+			return NameServer{}, err
+		}
+		ns.URL = dotURL
 	}
 
 	return ns, nil
+}
+
+func parseDoTURL(parsedURL *url.URL) (string, error) {
+	if parsedURL.Hostname() == "" {
+		return "", fmt.Errorf("dot nameserver url is missing host")
+	}
+	if parsedURL.User != nil || (parsedURL.Path != "" && parsedURL.Path != "/") || parsedURL.RawQuery != "" || parsedURL.Fragment != "" {
+		return "", fmt.Errorf("dot nameserver url must only contain a host and an optional port")
+	}
+	if port := parsedURL.Port(); port != "" {
+		if _, err := strconv.ParseUint(port, 10, 16); err != nil {
+			return "", fmt.Errorf("invalid dot nameserver port, got %s", port)
+		}
+	}
+	return "tls://" + parsedURL.Host, nil
 }
 
 // Copy copies a nameserver group object

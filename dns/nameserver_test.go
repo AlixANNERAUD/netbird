@@ -38,6 +38,45 @@ func TestParseNameServerURL(t *testing.T) {
 			},
 		},
 		{
+			name:  "dot url is normalized to tls",
+			input: "dot://dns.quad9.net",
+			want: NameServer{
+				NSType: DoTNameServerType,
+				URL:    "tls://dns.quad9.net",
+			},
+		},
+		{
+			name:  "dot with ip literal and port",
+			input: "dot://9.9.9.9:853",
+			want: NameServer{
+				NSType: DoTNameServerType,
+				URL:    "tls://9.9.9.9:853",
+			},
+		},
+		{
+			name:  "dot with ipv6 literal",
+			input: "dot://[2620:fe::fe]:853",
+			want: NameServer{
+				NSType: DoTNameServerType,
+				URL:    "tls://[2620:fe::fe]:853",
+			},
+		},
+		{
+			name:    "dot missing host rejected",
+			input:   "dot://:853",
+			wantErr: true,
+		},
+		{
+			name:    "dot with path rejected",
+			input:   "dot://dns.quad9.net/dns-query",
+			wantErr: true,
+		},
+		{
+			name:    "dot with invalid port rejected",
+			input:   "dot://dns.quad9.net:99999",
+			wantErr: true,
+		},
+		{
 			name:    "unknown scheme rejected",
 			input:   "ftp://1.2.3.4:53",
 			wantErr: true,
@@ -69,7 +108,7 @@ func TestParseNameServerURL(t *testing.T) {
 }
 
 func TestNameServerType_RoundTrip(t *testing.T) {
-	for _, tc := range []NameServerType{UDPNameServerType, DoHNameServerType} {
+	for _, tc := range []NameServerType{UDPNameServerType, DoHNameServerType, DoTNameServerType} {
 		got := ToNameServerType(tc.String())
 		if got != tc {
 			t.Errorf("round-trip mismatch for %v: got %v", tc, got)

@@ -55,3 +55,19 @@ func TestDoHClient_Live_Cloudflare(t *testing.T) {
 	assert.NotEmpty(t, resp.Answer, "expected at least one answer record")
 	t.Logf("DoH cloudflare-dns.com rtt=%s answers=%d", rtt.Truncate(time.Millisecond), len(resp.Answer))
 }
+
+func TestDoTClient_Live_Quad9(t *testing.T) {
+	doh := newDoHClient()
+	c := newDoTClient(doh.dialContext)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	target := upstreamTarget{NSType: nbdns.DoTNameServerType, URL: "tls://9.9.9.9"}
+	resp, rtt, err := c.exchange(ctx, target, new(dns.Msg).SetQuestion("example.com.", dns.TypeA))
+	require.NoError(t, err, "live DoT exchange failed")
+	require.NotNil(t, resp)
+	assert.Equal(t, dns.RcodeSuccess, resp.Rcode, "expected NOERROR, got %s", dns.RcodeToString[resp.Rcode])
+	assert.NotEmpty(t, resp.Answer, "expected at least one answer record")
+	t.Logf("DoT 9.9.9.9 rtt=%s answers=%d", rtt.Truncate(time.Millisecond), len(resp.Answer))
+}

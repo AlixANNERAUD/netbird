@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	nbdns "github.com/netbirdio/netbird/dns"
 	"github.com/netbirdio/netbird/shared/management/http/api"
@@ -267,6 +268,70 @@ func TestToServerNSList_IPv6(t *testing.T) {
 				assert.Equal(t, tc.expectIP, result[0].IP)
 				assert.Equal(t, 53, result[0].Port)
 			}
+		})
+	}
+}
+
+func TestToServerNSList_EncryptedTypes(t *testing.T) {
+	tests := []struct {
+		name       string
+		input      api.Nameserver
+		expectType nbdns.NameServerType
+		expectURL  string
+		expectErr  bool
+	}{
+		{
+			name:       "doh",
+			input:      api.Nameserver{NsType: "doh", Url: ptrString("https://dns.google/dns-query")},
+			expectType: nbdns.DoHNameServerType,
+			expectURL:  "https://dns.google/dns-query",
+		},
+		{
+			name:       "dot hostname",
+			input:      api.Nameserver{NsType: "dot", Url: ptrString("tls://dns.quad9.net")},
+			expectType: nbdns.DoTNameServerType,
+			expectURL:  "tls://dns.quad9.net",
+		},
+		{
+			name:       "dot ip literal with port",
+			input:      api.Nameserver{NsType: "dot", Url: ptrString("tls://9.9.9.9:853")},
+			expectType: nbdns.DoTNameServerType,
+			expectURL:  "tls://9.9.9.9:853",
+		},
+		{
+			name:      "dot without url",
+			input:     api.Nameserver{NsType: "dot"},
+			expectErr: true,
+		},
+		{
+			name:      "dot with https url",
+			input:     api.Nameserver{NsType: "dot", Url: ptrString("https://dns.quad9.net")},
+			expectErr: true,
+		},
+		{
+			name:      "dot with path",
+			input:     api.Nameserver{NsType: "dot", Url: ptrString("tls://dns.quad9.net/dns-query")},
+			expectErr: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result, err := toServerNSList([]api.Nameserver{tc.input})
+			if tc.expectErr {
+				assert.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.Len(t, result, 1)
+			assert.Equal(t, tc.expectType, result[0].NSType, "nameserver type must match the API type")
+			assert.Equal(t, tc.expectURL, result[0].URL, "the stored URL must be usable by the client")
+
+			response := toNameserverGroupResponse(&nbdns.NameServerGroup{NameServers: result})
+			require.Len(t, response.Nameservers, 1)
+			assert.Equal(t, tc.input.NsType, response.Nameservers[0].NsType, "the API must return the same type")
+			require.NotNil(t, response.Nameservers[0].Url, "encrypted nameservers must be returned with their URL")
+			assert.Equal(t, tc.expectURL, *response.Nameservers[0].Url, "the API must return the stored URL")
 		})
 	}
 }

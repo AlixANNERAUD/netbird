@@ -604,12 +604,12 @@ func TestEncodeNetworkMapEnvelope_ResourceOnlyPolicyShippedAndIndexed(t *testing
 
 func TestEncodeNetworkMapEnvelope_NameServerGroups(t *testing.T) {
 	c := newTestComponents()
-	c.GetPeerInfo(c.PeerID).Meta.Capabilities = append(c.GetPeerInfo(c.PeerID).Meta.Capabilities, nmdata.PeerCapabilityDNSOverHTTPS)
+	c.GetPeerInfo(c.PeerID).Meta.Capabilities = append(c.GetPeerInfo(c.PeerID).Meta.Capabilities, nmdata.PeerCapabilityDNSOverHTTPS, nmdata.PeerCapabilityDNSOverTLS)
 	c.NameServerGroups = []*nmdata.NameServerGroup{{
 		ID: "nsg-1", PublicID: "50", Name: "Main", Description: "primary",
 		NameServers: []nmdata.NameServer{{
 			IP: netip.MustParseAddr("8.8.8.8"), NSType: int(nbdns.UDPNameServerType), Port: 53,
-		}, {NSType: int(nbdns.DoHNameServerType), URL: "https://dns.example/dns-query"}},
+		}, {NSType: int(nbdns.DoHNameServerType), URL: "https://dns.example/dns-query"}, {NSType: int(nbdns.DoTNameServerType), URL: "tls://dns.example"}},
 		Groups:  []string{"group-src", "group-not-persisted"},
 		Primary: true, Enabled: true,
 		Domains: []string{"corp.example"},
@@ -621,7 +621,8 @@ func TestEncodeNetworkMapEnvelope_NameServerGroups(t *testing.T) {
 	nsg := full.NameserverGroups[0]
 	assert.EqualValues(t, "50", nsg.Id)
 	assert.True(t, nsg.Primary)
-	require.Len(t, nsg.Nameservers, 2)
+	require.Len(t, nsg.Nameservers, 3)
+	assert.Equal(t, "tls://dns.example", nsg.Nameservers[2].URL)
 	assert.Empty(t, nsg.Nameservers[1].IP)
 	assert.Equal(t, "https://dns.example/dns-query", nsg.Nameservers[1].URL)
 	assert.Equal(t, "8.8.8.8", nsg.Nameservers[0].IP)
@@ -769,4 +770,35 @@ func emptyNetworkMapComponents() *types.NetworkMapComponents {
 			},
 		},
 	)
+}
+
+func TestEncodeNetworkMapEnvelope_NameServerGroupsFilteredByCapability(t *testing.T) {
+	c := newTestComponents()
+	c.GetPeerInfo(c.PeerID).Meta.Capabilities = append(c.GetPeerInfo(c.PeerID).Meta.Capabilities, nmdata.PeerCapabilityDNSOverHTTPS)
+	c.NameServerGroups = []*nmdata.NameServerGroup{
+		{
+			ID: "nsg-mixed", PublicID: "51", Name: "Mixed",
+			NameServers: []nmdata.NameServer{
+				{NSType: int(nbdns.DoHNameServerType), URL: "https://dns.example/dns-query"},
+				{NSType: int(nbdns.DoTNameServerType), URL: "tls://dns.example"},
+			},
+			Groups:  []string{"group-src"},
+			Primary: true, Enabled: true,
+		},
+		{
+			ID: "nsg-dot", PublicID: "52", Name: "DoT only",
+			NameServers: []nmdata.NameServer{{NSType: int(nbdns.DoTNameServerType), URL: "tls://dns.example"}},
+			Groups:      []string{"group-src"},
+			Enabled:     true,
+			Domains:     []string{"dot.example"},
+		},
+	}
+
+	full := EncodeNetworkMapEnvelope(ComponentsEnvelopeInput{Components: c}).GetFull()
+
+	require.Len(t, full.NameserverGroups, 1, "a group left without supported nameservers must be dropped")
+	nsg := full.NameserverGroups[0]
+	assert.EqualValues(t, "51", nsg.Id, "the mixed group must be kept")
+	require.Len(t, nsg.Nameservers, 1, "a DoH-only peer must not receive DoT nameservers")
+	assert.Equal(t, "https://dns.example/dns-query", nsg.Nameservers[0].URL, "the DoH nameserver must be kept")
 }

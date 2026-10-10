@@ -2165,15 +2165,16 @@ components:
       properties:
         ip:
           description: |
-            Nameserver IP. Required for `udp` nameservers. Empty for `doh`.
+            Nameserver IP. Required for `udp` nameservers. Empty for `doh` and `dot`.
           type: string
           example: 8.8.8.8
         ns_type:
           description: |
             Nameserver Type. `udp` uses plain DNS over UDP. `doh` issues
             DNS-over-HTTPS requests against the URL in the `url` field.
+            `dot` issues DNS-over-TLS requests against the host in the `url` field.
           type: string
-          enum: [ "udp", "doh" ]
+          enum: [ "udp", "doh", "dot" ]
           example: udp
         port:
           description: Nameserver Port. Required for `udp` nameservers; ignored otherwise.
@@ -2182,7 +2183,9 @@ components:
         url:
           description: |
             Nameserver URL. For `doh`, the full https endpoint
-            (e.g. `https://dns.google/dns-query`).
+            (e.g. `https://dns.google/dns-query`). For `dot`, `tls://<host>[:<port>]`
+            with port 853 by default (e.g. `tls://dns.quad9.net`). An IP literal host
+            needs no bootstrap lookup and is verified against the certificate's IP addresses.
           type: string
           example: https://dns.google/dns-query
       required:

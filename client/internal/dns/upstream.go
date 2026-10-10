@@ -173,6 +173,7 @@ type upstreamResolverBase struct {
 	cancel          context.CancelFunc
 	upstreamClient  upstreamClient
 	dohClient       *dohClient
+	dotClient       *dotClient
 	upstreamServers []upstreamRace
 	domain          domain.Domain
 	upstreamTimeout time.Duration
@@ -234,6 +235,7 @@ func setUpstreamProtocol(ctx context.Context, protocol string) {
 
 func newUpstreamResolverBase(ctx context.Context, statusRecorder *peer.Status, d domain.Domain) *upstreamResolverBase {
 	ctx, cancel := context.WithCancel(ctx)
+	doh := newDoHClient()
 
 	return &upstreamResolverBase{
 		ctx:             ctx,
@@ -241,7 +243,8 @@ func newUpstreamResolverBase(ctx context.Context, statusRecorder *peer.Status, d
 		domain:          d,
 		upstreamTimeout: UpstreamTimeout,
 		statusRecorder:  statusRecorder,
-		dohClient:       newDoHClient(),
+		dohClient:       doh,
+		dotClient:       newDoTClient(doh.dialContext),
 	}
 }
 
@@ -250,13 +253,37 @@ func newUpstreamResolverBase(ctx context.Context, statusRecorder *peer.Status, d
 // specific UDP exchange implementations.
 func (u *upstreamResolverBase) exchangeUpstream(ctx context.Context, target upstreamTarget, r *dns.Msg) (*dns.Msg, time.Duration, error) {
 	switch target.NSType {
-	case nbdns.DoHNameServerType:
-		if u.dohClient == nil {
-			return nil, 0, fmt.Errorf("doh client not configured")
+	case nbdns.DoHNameServerType, nbdns.DoTNameServerType:
+		rm, t, err := u.exchangeEncrypted(ctx, target, r)
+		if err != nil {
+			return nil, t, err
 		}
-		return u.dohClient.exchange(ctx, target, r)
+		truncateForUDPClient(ctx, r, rm)
+		return rm, t, nil
 	default:
 		return u.upstreamClient.exchange(ctx, target.AddrPort.String(), r)
+	}
+}
+
+func (u *upstreamResolverBase) exchangeEncrypted(ctx context.Context, target upstreamTarget, r *dns.Msg) (*dns.Msg, time.Duration, error) {
+	if target.NSType == nbdns.DoTNameServerType {
+		if u.dotClient == nil {
+			return nil, 0, fmt.Errorf("dot client not configured")
+		}
+		return u.dotClient.exchange(ctx, target, r)
+	}
+	if u.dohClient == nil {
+		return nil, 0, fmt.Errorf("doh client not configured")
+	}
+	return u.dohClient.exchange(ctx, target, r)
+}
+
+func truncateForUDPClient(ctx context.Context, r, rm *dns.Msg) {
+	if dnsProtocolFromContext(ctx) == protoTCP {
+		return
+	}
+	if maxSize := clientUDPMaxSize(r); rm.Len() > maxSize {
+		rm.Truncate(maxSize)
 	}
 }
 
