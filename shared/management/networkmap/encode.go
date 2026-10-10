@@ -342,21 +342,23 @@ func BuildAuthorizedUsersProto(ctx context.Context, authorizedUsers map[string]m
 
 // NameServerSupport lists the encrypted nameserver transports a peer understands.
 type NameServerSupport struct {
-	DoH bool
-	DoT bool
+	DoH     bool
+	DoT     bool
+	NextDNS bool
 }
 
 // NameServerSupportOf derives the encrypted nameserver transports a peer
 // understands from its advertised capabilities.
 func NameServerSupportOf(hasCapability func(int32) bool) NameServerSupport {
 	return NameServerSupport{
-		DoH: hasCapability(nmdata.PeerCapabilityDNSOverHTTPS),
-		DoT: hasCapability(nmdata.PeerCapabilityDNSOverTLS),
+		DoH:     hasCapability(nmdata.PeerCapabilityDNSOverHTTPS),
+		DoT:     hasCapability(nmdata.PeerCapabilityDNSOverTLS),
+		NextDNS: hasCapability(nmdata.PeerCapabilityNextDNS),
 	}
 }
 
 func (s NameServerSupport) all() bool {
-	return s.DoH && s.DoT
+	return s.DoH && s.DoT && s.NextDNS
 }
 
 func (s NameServerSupport) allows(server *proto.NameServer) bool {
@@ -367,6 +369,8 @@ func (s NameServerSupport) allows(server *proto.NameServer) bool {
 		return s.DoH
 	case nbdns.DoTNameServerType:
 		return s.DoT
+	case nbdns.NextDNSNameServerType:
+		return s.NextDNS
 	default:
 		return false
 	}

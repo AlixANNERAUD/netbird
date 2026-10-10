@@ -255,6 +255,8 @@ enum PeerCapability {
   PeerCapabilityDNSOverHTTPS = 4;
   // Understands URL-based DoT nameservers.
   PeerCapabilityDNSOverTLS = 5;
+  // Understands NextDNS profile nameservers.
+  PeerCapabilityNextDNS = 6;
 }
 
 // PeerSystemMeta is machine meta data like OS and version.

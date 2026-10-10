@@ -604,12 +604,12 @@ func TestEncodeNetworkMapEnvelope_ResourceOnlyPolicyShippedAndIndexed(t *testing
 
 func TestEncodeNetworkMapEnvelope_NameServerGroups(t *testing.T) {
 	c := newTestComponents()
-	c.GetPeerInfo(c.PeerID).Meta.Capabilities = append(c.GetPeerInfo(c.PeerID).Meta.Capabilities, nmdata.PeerCapabilityDNSOverHTTPS, nmdata.PeerCapabilityDNSOverTLS)
+	c.GetPeerInfo(c.PeerID).Meta.Capabilities = append(c.GetPeerInfo(c.PeerID).Meta.Capabilities, nmdata.PeerCapabilityDNSOverHTTPS, nmdata.PeerCapabilityDNSOverTLS, nmdata.PeerCapabilityNextDNS)
 	c.NameServerGroups = []*nmdata.NameServerGroup{{
 		ID: "nsg-1", PublicID: "50", Name: "Main", Description: "primary",
 		NameServers: []nmdata.NameServer{{
 			IP: netip.MustParseAddr("8.8.8.8"), NSType: int(nbdns.UDPNameServerType), Port: 53,
-		}, {NSType: int(nbdns.DoHNameServerType), URL: "https://dns.example/dns-query"}, {NSType: int(nbdns.DoTNameServerType), URL: "tls://dns.example"}},
+		}, {NSType: int(nbdns.DoHNameServerType), URL: "https://dns.example/dns-query"}, {NSType: int(nbdns.DoTNameServerType), URL: "tls://dns.example"}, {NSType: int(nbdns.NextDNSNameServerType), URL: "abc123"}},
 		Groups:  []string{"group-src", "group-not-persisted"},
 		Primary: true, Enabled: true,
 		Domains: []string{"corp.example"},
@@ -621,8 +621,9 @@ func TestEncodeNetworkMapEnvelope_NameServerGroups(t *testing.T) {
 	nsg := full.NameserverGroups[0]
 	assert.EqualValues(t, "50", nsg.Id)
 	assert.True(t, nsg.Primary)
-	require.Len(t, nsg.Nameservers, 3)
+	require.Len(t, nsg.Nameservers, 4)
 	assert.Equal(t, "tls://dns.example", nsg.Nameservers[2].URL)
+	assert.Equal(t, "abc123", nsg.Nameservers[3].URL)
 	assert.Empty(t, nsg.Nameservers[1].IP)
 	assert.Equal(t, "https://dns.example/dns-query", nsg.Nameservers[1].URL)
 	assert.Equal(t, "8.8.8.8", nsg.Nameservers[0].IP)

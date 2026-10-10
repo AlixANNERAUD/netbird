@@ -299,6 +299,17 @@ func TestToServerNSList_EncryptedTypes(t *testing.T) {
 			expectURL:  "tls://9.9.9.9:853",
 		},
 		{
+			name:       "nextdns profile",
+			input:      api.Nameserver{NsType: "nextdns", Url: ptrString("abc123")},
+			expectType: nbdns.NextDNSNameServerType,
+			expectURL:  "abc123",
+		},
+		{
+			name:      "nextdns without profile",
+			input:     api.Nameserver{NsType: "nextdns"},
+			expectErr: true,
+		},
+		{
 			name:      "dot without url",
 			input:     api.Nameserver{NsType: "dot"},
 			expectErr: true,

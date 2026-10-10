@@ -19,6 +19,10 @@ const (
 	// DoTNameServerType DNS-over-TLS nameserver type. NameServer.URL holds
 	// `tls://<host>[:<port>]`; IP and Port are unused.
 	DoTNameServerType
+	// NextDNSNameServerType NextDNS DoH shorthand. NameServer.URL holds the
+	// NextDNS profile/config ID; the client builds the full URL at query time
+	// and appends device identification.
+	NextDNSNameServerType
 )
 
 const (
@@ -32,6 +36,8 @@ const (
 	DoHNameServerTypeString = "doh"
 	// DoTNameServerTypeString DoT nameserver type as string
 	DoTNameServerTypeString = "dot"
+	// NextDNSNameServerTypeString NextDNS nameserver type as string
+	NextDNSNameServerTypeString = "nextdns"
 )
 
 // NameServerType nameserver type
@@ -46,6 +52,8 @@ func (n NameServerType) String() string {
 		return DoHNameServerTypeString
 	case DoTNameServerType:
 		return DoTNameServerTypeString
+	case NextDNSNameServerType:
+		return NextDNSNameServerTypeString
 	default:
 		return InvalidNameServerTypeString
 	}
@@ -60,6 +68,8 @@ func ToNameServerType(typeString string) NameServerType {
 		return DoHNameServerType
 	case DoTNameServerTypeString:
 		return DoTNameServerType
+	case NextDNSNameServerTypeString:
+		return NextDNSNameServerType
 	default:
 		return InvalidNameServerType
 	}
@@ -92,14 +102,15 @@ type NameServerGroup struct {
 
 // NameServer represents a DNS nameserver
 type NameServer struct {
-	// IP address of nameserver (UDP). Unset for DoH and DoT.
+	// IP address of nameserver (UDP). Unset for DoH, DoT and NextDNS.
 	IP netip.Addr
 	// NSType nameserver type
 	NSType NameServerType
-	// Port nameserver listening port (UDP). Unset for DoH and DoT.
+	// Port nameserver listening port (UDP). Unset for DoH, DoT and NextDNS.
 	Port int
 	// URL is used for non-IP nameserver types. For DoH it stores the full
-	// `https://...` endpoint; for DoT it stores `tls://<host>[:<port>]`.
+	// `https://...` endpoint; for DoT it stores `tls://<host>[:<port>]`; for
+	// NextDNS it stores the profile/config ID.
 	URL string
 }
 
@@ -138,6 +149,7 @@ func (n *NameServer) AddrPort() netip.AddrPort {
 //	udp://<ip>:<port>            e.g. udp://1.1.1.1:53
 //	doh://<host>[:<port>]/<path> e.g. doh://dns.google/dns-query
 //	dot://<host>[:<port>]        e.g. dot://dns.quad9.net
+//	nextdns://<config_id>        e.g. nextdns://abc123
 func ParseNameServerURL(nsURL string) (NameServer, error) {
 	parsedURL, err := url.Parse(nsURL)
 	if err != nil {
@@ -180,6 +192,16 @@ func ParseNameServerURL(nsURL string) (NameServer, error) {
 			return NameServer{}, err
 		}
 		ns.URL = dotURL
+
+	case NextDNSNameServerType:
+		configID := parsedURL.Host
+		if configID == "" {
+			configID = strings.TrimPrefix(parsedURL.Opaque, "/")
+		}
+		if configID == "" {
+			return NameServer{}, fmt.Errorf("nextdns nameserver url is missing config id")
+		}
+		ns.URL = configID
 	}
 
 	return ns, nil

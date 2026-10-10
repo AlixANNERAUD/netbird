@@ -673,9 +673,10 @@ func (e JobResponseStatus) Valid() bool {
 
 // Defines values for NameserverNsType.
 const (
-	NameserverNsTypeDoh NameserverNsType = "doh"
-	NameserverNsTypeDot NameserverNsType = "dot"
-	NameserverNsTypeUdp NameserverNsType = "udp"
+	NameserverNsTypeDoh     NameserverNsType = "doh"
+	NameserverNsTypeDot     NameserverNsType = "dot"
+	NameserverNsTypeNextdns NameserverNsType = "nextdns"
+	NameserverNsTypeUdp     NameserverNsType = "udp"
 )
 
 // Valid indicates whether the value is a known member of the NameserverNsType enum.
@@ -684,6 +685,8 @@ func (e NameserverNsType) Valid() bool {
 	case NameserverNsTypeDoh:
 		return true
 	case NameserverNsTypeDot:
+		return true
+	case NameserverNsTypeNextdns:
 		return true
 	case NameserverNsTypeUdp:
 		return true
@@ -3545,12 +3548,15 @@ type NBVersionCheck = MinVersionCheck
 
 // Nameserver defines model for Nameserver.
 type Nameserver struct {
-	// Ip Nameserver IP. Required for `udp` nameservers. Empty for `doh` and `dot`.
+	// Ip Nameserver IP. Required for `udp` nameservers. Empty for `doh`, `dot` and `nextdns`.
 	Ip *string `json:"ip,omitempty"`
 
 	// NsType Nameserver Type. `udp` uses plain DNS over UDP. `doh` issues
 	// DNS-over-HTTPS requests against the URL in the `url` field.
 	// `dot` issues DNS-over-TLS requests against the host in the `url` field.
+	// `nextdns` is shorthand for a NextDNS profile; the client builds
+	// the request URL from the profile/config ID stored in `url` and
+	// identifies the device through X-Device-Name and X-Device-Id HTTP headers.
 	NsType NameserverNsType `json:"ns_type"`
 
 	// Port Nameserver Port. Required for `udp` nameservers; ignored otherwise.
@@ -3560,12 +3566,16 @@ type Nameserver struct {
 	// (e.g. `https://dns.google/dns-query`). For `dot`, `tls://<host>[:<port>]`
 	// with port 853 by default (e.g. `tls://dns.quad9.net`). An IP literal host
 	// needs no bootstrap lookup and is verified against the certificate's IP addresses.
+	// For `nextdns`, the profile/config ID (e.g. `abc123`).
 	Url *string `json:"url,omitempty"`
 }
 
 // NameserverNsType Nameserver Type. `udp` uses plain DNS over UDP. `doh` issues
 // DNS-over-HTTPS requests against the URL in the `url` field.
 // `dot` issues DNS-over-TLS requests against the host in the `url` field.
+// `nextdns` is shorthand for a NextDNS profile; the client builds
+// the request URL from the profile/config ID stored in `url` and
+// identifies the device through X-Device-Name and X-Device-Id HTTP headers.
 type NameserverNsType string
 
 // NameserverGroup defines model for NameserverGroup.

@@ -254,6 +254,11 @@ func apiNameserverToURL(apiNS api.Nameserver) (string, error) {
 			return "", fmt.Errorf("dot nameserver requires url starting with tls://")
 		}
 		return "dot://" + strings.TrimPrefix(*apiNS.Url, "tls://"), nil
+	case api.NameserverNsTypeNextdns:
+		if apiNS.Url == nil || *apiNS.Url == "" {
+			return "", fmt.Errorf("nextdns nameserver requires url with config id")
+		}
+		return "nextdns://" + *apiNS.Url, nil
 	default:
 		return "", fmt.Errorf("unknown nameserver type %q", apiNS.NsType)
 	}
@@ -283,7 +288,7 @@ func toNameserverGroupResponse(serverNSGroup *nbdns.NameServerGroup) *api.Namese
 			port := ns.Port
 			apiNS.Ip = &ip
 			apiNS.Port = &port
-		case nbdns.DoHNameServerType, nbdns.DoTNameServerType:
+		case nbdns.DoHNameServerType, nbdns.DoTNameServerType, nbdns.NextDNSNameServerType:
 			url := ns.URL
 			apiNS.Url = &url
 		}

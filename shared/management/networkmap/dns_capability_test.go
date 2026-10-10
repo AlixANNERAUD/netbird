@@ -15,10 +15,11 @@ func TestDNSConfigForPeer(t *testing.T) {
 	udp := &proto.NameServer{NSType: int64(nbdns.UDPNameServerType), IP: "192.0.2.1", Port: 53}
 	doh := &proto.NameServer{NSType: int64(nbdns.DoHNameServerType), URL: "https://dns.example/query"}
 	dot := &proto.NameServer{NSType: int64(nbdns.DoTNameServerType), URL: "tls://dns.example"}
+	nextDNS := &proto.NameServer{NSType: int64(nbdns.NextDNSNameServerType), URL: "abc123"}
 	original := &proto.DNSConfig{
 		ServiceEnable: true,
 		NameServerGroups: []*proto.NameServerGroup{
-			{NameServers: []*proto.NameServer{udp, doh, dot}, Primary: true},
+			{NameServers: []*proto.NameServer{udp, doh, dot, nextDNS}, Primary: true},
 			{NameServers: []*proto.NameServer{doh}, Domains: []string{"doh.example"}},
 			{NameServers: []*proto.NameServer{dot}, Domains: []string{"dot.example"}},
 		},
@@ -34,10 +35,14 @@ func TestDNSConfigForPeer(t *testing.T) {
 	assert.Equal(t, []*proto.NameServer{udp, doh}, dohOnly.NameServerGroups[0].NameServers, "DoH-only clients must keep UDP and DoH upstreams")
 	assert.Equal(t, []string{"doh.example"}, dohOnly.NameServerGroups[1].Domains, "the DoH-only group must be kept")
 
-	capable := DNSConfigForPeer(original, NameServerSupport{DoH: true, DoT: true})
+	withoutNextDNS := DNSConfigForPeer(original, NameServerSupport{DoH: true, DoT: true})
+	require.Len(t, withoutNextDNS.NameServerGroups, 3, "DoH and DoT clients must receive every DoH and DoT group")
+	require.Len(t, withoutNextDNS.NameServerGroups[0].NameServers, 3, "DoH and DoT clients must not receive NextDNS nameservers")
+
+	capable := DNSConfigForPeer(original, NameServerSupport{DoH: true, DoT: true, NextDNS: true})
 	require.Len(t, capable.NameServerGroups, 3, "shared cached groups must remain intact for new clients")
-	assert.Len(t, capable.NameServerGroups[0].NameServers, 3, "capable clients must receive encrypted upstreams")
-	assert.Len(t, original.NameServerGroups[0].NameServers, 3, "filtering must not mutate the cached config")
+	assert.Len(t, capable.NameServerGroups[0].NameServers, 4, "capable clients must receive encrypted upstreams")
+	assert.Len(t, original.NameServerGroups[0].NameServers, 4, "filtering must not mutate the cached config")
 }
 
 func TestNameServerSupportOf(t *testing.T) {

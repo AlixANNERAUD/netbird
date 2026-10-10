@@ -21,7 +21,7 @@ import (
 // host directly (no bootstrap resolution), suitable for httptest.Server.
 func newTestDoHClient(t *testing.T, server *httptest.Server) *dohClient {
 	t.Helper()
-	c := newDoHClient()
+	c := newDoHClient(nil)
 	c.httpClient = server.Client()
 	return c
 }
@@ -70,18 +70,72 @@ func TestDoHClient_Exchange_GenericDoH(t *testing.T) {
 	assert.Contains(t, resp.Answer[0].String(), answer)
 }
 
+func TestDoHClient_Exchange_NextDNS_URLAndHeaders(t *testing.T) {
+	const fqdn = "laptop.peers.netbird.cloud"
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "dns.nextdns.io", r.Host, "request must retain the NextDNS authority")
+		assert.Equal(t, "/abc123", r.URL.Path, "profile must be in the request path")
+		assert.Equal(t, fqdn, r.Header.Get("X-Device-Name"), "request must identify the device")
+		assert.Equal(t, "laptop", r.Header.Get("X-Device-Id"), "request must carry the short device ID")
+		body, err := io.ReadAll(r.Body)
+		if !assert.NoError(t, err) {
+			return
+		}
+		query := new(dns.Msg)
+		if !assert.NoError(t, query.Unpack(body)) {
+			return
+		}
+		response, err := new(dns.Msg).SetReply(query).Pack()
+		if !assert.NoError(t, err) {
+			return
+		}
+		w.Header().Set("Content-Type", dohContentType)
+		_, err = w.Write(response)
+		assert.NoError(t, err)
+	}))
+	t.Cleanup(server.Close)
+	c := newDoHClient(nil)
+	t.Cleanup(c.httpClient.CloseIdleConnections)
+	c.deviceFn = func() string { return fqdn }
+	transport := c.httpClient.Transport.(*http.Transport)
+	transport.TLSClientConfig = server.Client().Transport.(*http.Transport).TLSClientConfig.Clone()
+	transport.TLSClientConfig.ServerName = "example.com"
+	transport.DialContext = func(ctx context.Context, network, _ string) (net.Conn, error) {
+		return new(net.Dialer).DialContext(ctx, network, server.Listener.Addr().String())
+	}
+	_, _, err := c.exchange(t.Context(), upstreamTarget{NSType: nbdns.NextDNSNameServerType, URL: "abc123"}, new(dns.Msg).SetQuestion("example.com.", dns.TypeA))
+	require.NoError(t, err)
+}
+
+func TestNextDNSDeviceID(t *testing.T) {
+	cases := []struct{ in, want string }{
+		{"laptop.peers.netbird.cloud", "laptop"},
+		{"client-a.anon-abc.domain", "client-a"},
+		{"justhostname", "justhostname"},
+		{"", ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.in, func(t *testing.T) {
+			assert.Equal(t, tc.want, nextDNSDeviceID(tc.in))
+		})
+	}
+}
+
 func TestDoHClient_EndpointURL_Errors(t *testing.T) {
-	c := newDoHClient()
+	c := newDoHClient(nil)
 
 	_, err := c.endpointURL(upstreamTarget{NSType: nbdns.DoHNameServerType})
 	assert.Error(t, err, "doh without URL should error")
+
+	_, err = c.endpointURL(upstreamTarget{NSType: nbdns.NextDNSNameServerType})
+	assert.Error(t, err, "nextdns without config id should error")
 
 	_, err = c.endpointURL(upstreamTarget{NSType: nbdns.UDPNameServerType})
 	assert.Error(t, err, "udp target should not be routed through dohClient")
 }
 
 func TestDoHClient_ResolveBootstrap_NoNameservers(t *testing.T) {
-	c := newDoHClient()
+	c := newDoHClient(nil)
 
 	_, err := c.resolveBootstrap(t.Context(), "dns.example.com")
 	require.Error(t, err, "lookup with no bootstrap configured must fail loudly")
@@ -133,7 +187,7 @@ func TestDoHClient_ResolveBootstrap_UsesProvidedNameservers(t *testing.T) {
 					assert.NoError(t, <-done)
 				})
 			}
-			c := newDoHClient()
+			c := newDoHClient(nil)
 			bootstrapAddr := netip.MustParseAddrPort(listener.Addr().String())
 			c.bootstrap = func() []netip.AddrPort { return []netip.AddrPort{bootstrapAddr} }
 			ctx, cancel := context.WithTimeout(t.Context(), time.Second)

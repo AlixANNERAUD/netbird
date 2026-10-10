@@ -235,7 +235,7 @@ func setUpstreamProtocol(ctx context.Context, protocol string) {
 
 func newUpstreamResolverBase(ctx context.Context, statusRecorder *peer.Status, d domain.Domain) *upstreamResolverBase {
 	ctx, cancel := context.WithCancel(ctx)
-	doh := newDoHClient()
+	doh := newDoHClient(statusRecorder)
 
 	return &upstreamResolverBase{
 		ctx:             ctx,
@@ -253,7 +253,7 @@ func newUpstreamResolverBase(ctx context.Context, statusRecorder *peer.Status, d
 // specific UDP exchange implementations.
 func (u *upstreamResolverBase) exchangeUpstream(ctx context.Context, target upstreamTarget, r *dns.Msg) (*dns.Msg, time.Duration, error) {
 	switch target.NSType {
-	case nbdns.DoHNameServerType, nbdns.DoTNameServerType:
+	case nbdns.DoHNameServerType, nbdns.DoTNameServerType, nbdns.NextDNSNameServerType:
 		rm, t, err := u.exchangeEncrypted(ctx, target, r)
 		if err != nil {
 			return nil, t, err
